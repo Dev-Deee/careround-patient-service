@@ -4,6 +4,7 @@ import com.dayo.careround.patientservice.data.models.Patient;
 import com.dayo.careround.patientservice.data.models.enums.PatientStatus;
 import com.dayo.careround.patientservice.data.repositories.NextOfKinRepository;
 import com.dayo.careround.patientservice.data.repositories.PatientRepository;
+import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import lombok.RequiredArgsConstructor;
 import net.devh.boot.grpc.server.service.GrpcService;
@@ -20,7 +21,8 @@ public class PatientCensusGrpcService extends PatientCensusServiceGrpc.PatientCe
 
     @Override
     public void getAdmittedCount(WardCensusRequest request, StreamObserver<WardCensusResponse> responseObserver) {
-        UUID wardId = UUID.fromString(request.getWardId());
+        UUID wardId = parseId(request.getWardId(), "ward_id", responseObserver);
+        if (wardId == null) return;
 
         int count = patientRepository.countByWardIdAndStatus(wardId, PatientStatus.ADMITTED);
 
@@ -34,7 +36,8 @@ public class PatientCensusGrpcService extends PatientCensusServiceGrpc.PatientCe
 
     @Override
     public void patientExists(PatientExistsRequest request, StreamObserver<PatientExistsResponse> responseObserver) {
-        UUID publicId = UUID.fromString(request.getPatientId());
+        UUID publicId = parseId(request.getPatientId(), "patient_id", responseObserver);
+        if (publicId == null) return;
         boolean exists = patientRepository.findByPublicId(publicId).isPresent();
 
         responseObserver.onNext(PatientExistsResponse.newBuilder().setExists(exists).build());
@@ -43,15 +46,20 @@ public class PatientCensusGrpcService extends PatientCensusServiceGrpc.PatientCe
 
     @Override
     public void getPrimaryNextOfKin(NextOfKinRequest request, StreamObserver<com.dayo.careround.patientservice.grpc.NextOfKinResponse> responseObserver) {
-        UUID patientPublicId = UUID.fromString(request.getPatientId());
+        UUID patientPublicId = parseId(request.getPatientId(), "patient_id", responseObserver);
+        if (patientPublicId == null) return;
 
         Patient patient = patientRepository.findByPublicId(patientPublicId).orElse(null);
 
         com.dayo.careround.patientservice.grpc.NextOfKinResponse.Builder builder =
                 com.dayo.careround.patientservice.grpc.NextOfKinResponse.newBuilder();
 
+        // Unknown patient is an error, distinct from a known patient with no next-of-kin (found=false).
         if (patient == null) {
-            builder.setFound(false);
+            responseObserver.onError(Status.NOT_FOUND
+                    .withDescription("No patient with id " + patientPublicId)
+                    .asRuntimeException());
+            return;
         } else {
             List<NextOfKin> kin = nextOfKinRepository.findByPatientIdOrderByPriorityOrderAsc(patient.getId());
             if (kin.isEmpty()) {
@@ -69,5 +77,17 @@ public class PatientCensusGrpcService extends PatientCensusServiceGrpc.PatientCe
 
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
+    }
+
+    // Malformed ids are the caller's fault: INVALID_ARGUMENT instead of an opaque UNKNOWN from UUID.fromString.
+    private static UUID parseId(String value, String field, StreamObserver<?> responseObserver) {
+        try {
+            return UUID.fromString(value);
+        } catch (IllegalArgumentException e) {
+            responseObserver.onError(Status.INVALID_ARGUMENT
+                    .withDescription(field + " is not a valid UUID: '" + value + "'")
+                    .asRuntimeException());
+            return null;
+        }
     }
 }
