@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -20,6 +21,7 @@ public class NextOfKinController {
     private final NextOfKinService nextOfKinService;
 
     @PostMapping
+    @PreAuthorize("hasRole('NURSE') or hasRole('DOCTOR') or hasRole('ADMIN')")
     public ResponseEntity<NextOfKinResponse> add(
             @PathVariable UUID patientPublicId,
             @Valid @RequestBody AddNextOfKinRequest request) {
@@ -32,6 +34,7 @@ public class NextOfKinController {
     }
 
     @DeleteMapping("/{nextOfKinId}")
+    @PreAuthorize("hasRole('NURSE') or hasRole('DOCTOR') or hasRole('ADMIN')")
     public ResponseEntity<Void> remove(
             @PathVariable UUID patientPublicId,
             @PathVariable UUID nextOfKinId) {
