@@ -4,6 +4,14 @@ Patients and their next-of-kin. HTTP 8084, gRPC 9090, DB `careround_patient_db`.
 
 - **REST:** `/api/v1/patients` (create / status: DOCTOR or ADMIN; reads: any authenticated user),
   `/api/v1/patients/{patientPublicId}/next-of-kin`.
+  - `GET /api/v1/patients?wardId=&status=&includeDischarged=false&page=0&size=20` → `{items, page, size, total}`; DISCHARGED
+    excluded unless `status=DISCHARGED` or `includeDischarged=true`; sorted by bed number, last name, first name; size max 100.
+    Without `page`/`size` the old bare array is returned (**deprecated**; same filters, capped at 100).
+  - `GET /api/v1/patients?ids=<publicId,...>` → batch lookup (max 100, any status, unknown ids omitted).
+  - PRD path `GET /wards/{wardId}/patients` → built as `GET /api/v1/patients?wardId=` (the gateway sends `/api/v1/wards/**`
+    to ward-service).
+  - Photo: `photo` is a free-text field stored as given (no upload or serving endpoint).
+  - Discharge (`PATCH …/status` to DISCHARGED) only changes the status; `wardId` and `bedNumber` stay (Phase 10).
 - **Admission verifies the ward** with ward-service `WardExists`: unknown ward → 404, ward-service unreachable → 503
   (fails closed).
 - **gRPC server (9090):** `PatientCensusService` — `GetAdmittedCount`, `PatientExists` (also returns the patient's
