@@ -6,6 +6,8 @@ import com.dayo.careround.patientservice.dto.request.CreatePatientRequest;
 import com.dayo.careround.patientservice.dto.request.UpdatePatientStatusRequest;
 import com.dayo.careround.patientservice.dto.response.PatientResponse;
 import com.dayo.careround.patientservice.exception.PatientNotFoundException;
+import com.dayo.careround.patientservice.exception.WardNotFoundException;
+import com.dayo.careround.patientservice.grpc.WardVerificationClient;
 import com.dayo.careround.patientservice.utils.PatientMapper;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -18,9 +20,13 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PatientService {
     private  final PatientRepository patientRepository;
+    private final WardVerificationClient wardVerificationClient;
 
     @Transactional
     public PatientResponse create(CreatePatientRequest request) {
+        if (!wardVerificationClient.wardExists(request.wardId())) {
+            throw new WardNotFoundException("No ward with that id");
+        }
         Patient patient = PatientMapper.toPatient(request);
         patientRepository.save(patient);
         return PatientMapper.toPatientResponse(patient);
