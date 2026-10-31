@@ -18,6 +18,16 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
+    @ExceptionHandler(WardNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleWardNotFound(WardNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
+
+    @ExceptionHandler(WardServiceUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleWardServiceUnavailable(WardServiceUnavailableException ex) {
+        return buildResponse(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    }
+
     @ExceptionHandler(NextOfKinNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNextOfKinNotFound(NextOfKinNotFoundException ex) {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());

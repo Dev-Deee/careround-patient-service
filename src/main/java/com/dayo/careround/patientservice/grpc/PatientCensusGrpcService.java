@@ -38,9 +38,13 @@ public class PatientCensusGrpcService extends PatientCensusServiceGrpc.PatientCe
     public void patientExists(PatientExistsRequest request, StreamObserver<PatientExistsResponse> responseObserver) {
         UUID publicId = parseId(request.getPatientId(), "patient_id", responseObserver);
         if (publicId == null) return;
-        boolean exists = patientRepository.findByPublicId(publicId).isPresent();
+        // ward_id lets callers (e.g. emergency declare) scope events to the patient's ward without a second call.
+        // Empty when the patient does not exist.
+        PatientExistsResponse response = patientRepository.findByPublicId(publicId)
+                .map(p -> PatientExistsResponse.newBuilder().setExists(true).setWardId(p.getWardId().toString()).build())
+                .orElseGet(() -> PatientExistsResponse.newBuilder().setExists(false).build());
 
-        responseObserver.onNext(PatientExistsResponse.newBuilder().setExists(exists).build());
+        responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
 
