@@ -3,6 +3,8 @@ package com.dayo.careround.patientservice.controllers;
 import com.dayo.careround.patientservice.dto.request.CreatePatientRequest;
 import com.dayo.careround.patientservice.dto.request.UpdatePatientStatusRequest;
 import com.dayo.careround.patientservice.dto.response.PatientResponse;
+import com.dayo.careround.patientservice.data.models.enums.PatientStatus;
+import com.dayo.careround.patientservice.exception.BadRequestException;
 import com.dayo.careround.patientservice.services.PatientService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -33,8 +35,28 @@ public class PatientController {
     }
 
     @GetMapping
-    public ResponseEntity<List<PatientResponse>> getByWard(@RequestParam UUID wardId) {
-        return ResponseEntity.ok(patientService.getByWard(wardId));
+    // ?ids=<publicId,...> batch (max 100) -> list. ?wardId=[&status][&includeDischarged] -> ward list; with page/size it
+    // returns {items, page, size, total}, without them the deprecated bare array (same filters). DISCHARGED is
+    // excluded unless asked for.
+    public ResponseEntity<?> list(@RequestParam(required = false) UUID wardId,
+                                  @RequestParam(required = false) List<UUID> ids,
+                                  @RequestParam(required = false) PatientStatus status,
+                                  @RequestParam(defaultValue = "false") boolean includeDischarged,
+                                  @RequestParam(required = false) Integer page,
+                                  @RequestParam(required = false) Integer size) {
+        if (ids != null) {
+            if (wardId != null || status != null) {
+                throw new BadRequestException("Use either ids or wardId/status, not both");
+            }
+            return ResponseEntity.ok(patientService.getByIds(ids));
+        }
+        if (wardId == null) {
+            throw new BadRequestException("wardId or ids is required");
+        }
+        if (page == null && size == null) {
+            return ResponseEntity.ok(patientService.getByWardLegacy(wardId, status, includeDischarged));
+        }
+        return ResponseEntity.ok(patientService.getByWard(wardId, status, includeDischarged, page, size));
     }
 
     @PatchMapping("/{publicId}/status")
